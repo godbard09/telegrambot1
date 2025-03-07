@@ -558,7 +558,7 @@ async def list_signals(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Phân tích và gửi tín hiệu mua bán tối ưu."""
+    """Phân tích và gửi tín hiệu mua bán tối ưu (không xóa tín hiệu MUA)."""
     try:
         symbol = context.args[0] if context.args else None
         if not symbol:
@@ -621,16 +621,15 @@ async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             # Kiểm tra tín hiệu mua
             if (row['close'] > row['MA50'] and row['MACD'] > row['Signal'] and row['RSI'] < 30) or (row['close'] <= row['BB_Lower']):
                 buy_signals.append({"price": row['close'], "timestamp": past_time})
-                signals_past.append(f"\U0001F7E2 Mua: Giá {row['close']:.2f} {unit} vào lúc {past_time}.")
+                signals_past.append(f"🟢 Mua: Giá {row['close']:.2f} {unit} vào lúc {past_time}.")
 
             # Kiểm tra tín hiệu bán
             elif (row['close'] < row['MA50'] and row['MACD'] < row['Signal'] and row['RSI'] > 70) or (row['close'] >= row['BB_Upper']):
                 if buy_signals:
                     last_buy = buy_signals[-1]  # Lấy lần mua gần nhất
                     profit_loss = ((row['close'] - last_buy['price']) / last_buy['price']) * 100
-                    profit_icon = "\U0001F7E2" if profit_loss >= 0 else "\U0001F534"
-                    signals_past.append(f"\U0001F534 Bán: Giá {row['close']:.2f} {unit} vào lúc {past_time}. {profit_icon} Lãi/Lỗ: {profit_loss:.2f}%")
-                    buy_signals.pop()  # Loại bỏ tín hiệu mua đã sử dụng
+                    profit_icon = "🟢" if profit_loss >= 0 else "🔴"
+                    signals_past.append(f"🔴 Bán: Giá {row['close']:.2f} {unit} vào lúc {past_time}. {profit_icon} Lãi/Lỗ: {profit_loss:.2f}%")
 
         # Phát hiện tín hiệu hiện tại
         last_row = df.iloc[-1]
@@ -641,16 +640,15 @@ async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         # Kiểm tra tín hiệu mua
         if (last_row['close'] > last_row['MA50'] and last_row['MACD'] > last_row['Signal'] and last_row['RSI'] < 30) or (last_row['close'] <= last_row['BB_Lower']):
             buy_signals.append({"price": last_row['close'], "timestamp": current_time})
-            signals_now.append(f"\U0001F7E2 Mua: Giá {last_row['close']:.2f} {unit} vào lúc {current_time}.")
+            signals_now.append(f"🟢 Mua: Giá {last_row['close']:.2f} {unit} vào lúc {current_time}.")
 
         # Kiểm tra tín hiệu bán
         elif (last_row['close'] < last_row['MA50'] and last_row['MACD'] < last_row['Signal'] and last_row['RSI'] > 70) or (last_row['close'] >= last_row['BB_Upper']):
             if buy_signals:
                 last_buy = buy_signals[-1]
                 profit_loss = ((current_price - last_buy['price']) / last_buy['price']) * 100
-                profit_icon = "\U0001F7E2" if profit_loss >= 0 else "\U0001F534"
-                signals_now.append(f"\U0001F534 Bán: Giá {current_price:.2f} {unit} vào lúc {current_time}. {profit_icon} Lãi/Lỗ: {profit_loss:.2f}%")
-                buy_signals.pop()
+                profit_icon = "🟢" if profit_loss >= 0 else "🔴"
+                signals_now.append(f"🔴 Bán: Giá {current_price:.2f} {unit} vào lúc {current_time}. {profit_icon} Lãi/Lỗ: {profit_loss:.2f}%")
 
         # Gửi tín hiệu qua Telegram
         signal_message = f"Tín hiệu giao dịch cho {symbol}:\n"
