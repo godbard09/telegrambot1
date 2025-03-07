@@ -558,7 +558,7 @@ async def list_signals(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Phân tích và gửi tín hiệu mua bán (có thể tìm tín hiệu MUA cũ hơn 7 ngày nếu có BÁN trong 7 ngày)."""
+    """Phân tích và gửi tín hiệu mua bán (đồng bộ hóa với /smarttrade)."""
     try:
         symbol = context.args[0] if context.args else None
         if not symbol:
@@ -601,6 +601,7 @@ async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
         rs = gain / loss
         df['RSI'] = 100 - (100 / (1 + rs))
+        df['RSI'].fillna(50, inplace=True)  # Tránh lỗi NaN
 
         df['BB_Middle'] = df['close'].rolling(window=20).mean()
         df['BB_Upper'] = df['BB_Middle'] + 2 * df['close'].rolling(window=20).std()
@@ -625,12 +626,10 @@ async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             if (row['close'] < row['MA50'] and row['MACD'] < row['Signal'] and row['RSI'] > 70) or (row['close'] >= row['BB_Upper']):
                 sell_signals.append({"price": row['close'], "timestamp": row['timestamp']})
 
-        # Nếu có BÁN trong 7 ngày nhưng không có MUA, tìm MUA cũ hơn 7 ngày
+        # 🔥 Cập nhật: Tìm tín hiệu MUA gần nhất như cách /smarttrade lấy dữ liệu
         if sell_signals and not buy_signals:
-            old_buys = df[df['timestamp'] < past_threshold]  # Tìm MUA cũ hơn 7 ngày
-            if not old_buys.empty:
-                last_buy = old_buys.iloc[-1]  # Lấy lần mua gần nhất
-                buy_signals.append({"price": last_buy['close'], "timestamp": last_buy['timestamp']})
+            last_buy_signal = df[df['timestamp'] < past_threshold].iloc[-1]  # Lấy tín hiệu MUA gần nhất (dù ngoài 7 ngày)
+            buy_signals.append({"price": last_buy_signal['close'], "timestamp": last_buy_signal['timestamp']})
 
         # Danh sách hiển thị
         signals_now = []
