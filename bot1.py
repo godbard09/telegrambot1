@@ -601,7 +601,6 @@ async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
         rs = gain / loss
         df['RSI'] = 100 - (100 / (1 + rs))
-        df['RSI'].fillna(50, inplace=True)  # Tránh lỗi NaN
 
         df['BB_Middle'] = df['close'].rolling(window=20).mean()
         df['BB_Upper'] = df['BB_Middle'] + 2 * df['close'].rolling(window=20).std()
