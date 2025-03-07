@@ -1,0 +1,8 @@
+python-telegram-bot==20.3  # Thư viện để làm việc với Telegram bot
+ccxt==4.4.42              # Thư viện để giao dịch với các sàn như KuCoin
+pandas>=1.4.0             # Thư viện để xử lý dữ liệu
+plotly==5.16.1            # Thư viện để tạo biểu đồ
+asyncio==3.4.3            # Thư viện cho lập trình bất đồng bộ (thường đã tích hợp)
+numpy>=1.22.0
+python-telegram-bot[job-queue]==20.3
+python-telegram-bot[webhooks]==20.3
