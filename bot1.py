@@ -744,6 +744,11 @@ async def info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(f"Đã xảy ra lỗi: {e}")
 
 
+TIMEFRAME_MAPPING = {
+    "1h": "price_change_percentage_1h_in_currency",
+    "1d": "price_change_percentage_24h_in_currency",
+    "1w": "price_change_percentage_7d_in_currency"
+}
 
 async def send_heatmap(chat, timeframe: str):
     """Tạo và gửi heatmap có màu giống hình mẫu"""
