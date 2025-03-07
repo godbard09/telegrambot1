@@ -558,7 +558,7 @@ async def list_signals(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Phân tích và gửi tín hiệu mua bán (luôn đảm bảo tính toán lãi/lỗ chính xác)."""
+    """Phát hiện tín hiệu mua/bán và tính toán lãi/lỗ theo thời gian tăng dần."""
     try:
         symbol = context.args[0] if context.args else None
         if not symbol:
@@ -582,77 +582,51 @@ async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
         # Tính toán chỉ báo kỹ thuật
         df['MA50'] = df['close'].rolling(window=50).mean()
-        df['MA100'] = df['close'].rolling(window=100).mean()
         df['EMA12'] = df['close'].ewm(span=12, adjust=False).mean()
         df['EMA26'] = df['close'].ewm(span=26, adjust=False).mean()
         df['MACD'] = df['EMA12'] - df['EMA26']
         df['Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
+        df['BB_Middle'] = df['close'].rolling(window=20).mean()
+        df['BB_Upper'] = df['BB_Middle'] + 2 * df['close'].rolling(window=20).std()
+        df['BB_Lower'] = df['BB_Middle'] - 2 * df['close'].rolling(window=20).std()
 
+        # RSI Calculation
         delta = df['close'].diff()
         gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
         rs = gain / loss
         df['RSI'] = 100 - (100 / (1 + rs))
-        df['RSI'].fillna(50, inplace=True)  # Tránh lỗi NaN
 
-        df['BB_Middle'] = df['close'].rolling(window=20).mean()
-        df['BB_Upper'] = df['BB_Middle'] + 2 * df['close'].rolling(window=20).std()
-        df['BB_Lower'] = df['BB_Middle'] - 2 * df['close'].rolling(window=20).std()
-
-        # Lọc dữ liệu 7 ngày gần nhất
+        # Xác định khoảng thời gian 7 ngày qua
         past_threshold = pd.Timestamp.now(tz='Asia/Ho_Chi_Minh') - pd.Timedelta(days=7)
         df_past = df[df['timestamp'] >= past_threshold]
 
-        # Danh sách lưu tín hiệu
-        buy_signals = []
-        sell_signals = []
-
-        # ✅ Ghi nhớ giá mua gần nhất (kể cả ngoài 7 ngày)
+        # Danh sách tín hiệu (Lưu theo thứ tự thời gian tăng dần)
+        signals_list = []
         last_buy_signal = None
 
-        for _, row in df.iterrows():  # Duyệt qua toàn bộ lịch sử dữ liệu
+        for _, row in df.iterrows():  # Duyệt qua toàn bộ lịch sử
+            timestamp_str = row['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
+
+            # Phát hiện tín hiệu MUA
             if (row['close'] > row['MA50'] and row['MACD'] > row['Signal'] and row['RSI'] < 30) or (row['close'] <= row['BB_Lower']):
-                last_buy_signal = {"price": row['close'], "timestamp": row['timestamp']}
+                last_buy_signal = {"price": row['close'], "timestamp": row['timestamp']}  # Lưu lại giá mua gần nhất
+                profit_loss = ((df.iloc[-1]['close'] - row['close']) / row['close']) * 100  # Lãi/Lỗ dựa trên giá hiện tại
+                signals_list.append(f"🟢 Mua: Giá {row['close']:.2f} USDT vào lúc {timestamp_str}. 🟢 Lãi/Lỗ: {profit_loss:.2f}%")
 
-            if row['timestamp'] >= past_threshold:
-                # ✅ Chỉ thêm vào danh sách nếu nằm trong 7 ngày gần nhất
-                if last_buy_signal and row['timestamp'] >= last_buy_signal['timestamp']:
-                    buy_signals.append(last_buy_signal)
-
-                if (row['close'] < row['MA50'] and row['MACD'] < row['Signal'] and row['RSI'] > 70) or (row['close'] >= row['BB_Upper']):
-                    sell_signals.append({"price": row['close'], "timestamp": row['timestamp']})
-
-        # ✅ Luôn đảm bảo tìm được giá mua gần nhất để tính lãi/lỗ
-        last_buy_price = last_buy_signal['price'] if last_buy_signal else None
-        last_buy_time = last_buy_signal['timestamp'] if last_buy_signal else None
-
-        # 🔥 Hiển thị tín hiệu MUA & BÁN
-        signals_past = []
-
-        for buy in buy_signals:
-            signals_past.append(f"🟢 Mua: Giá {buy['price']:.2f} vào {buy['timestamp'].strftime('%Y-%m-%d %H:%M:%S')}")
-
-        for sell in sell_signals:
-            if last_buy_price:
-                profit_loss = ((sell['price'] - last_buy_price) / last_buy_price) * 100
-                profit_icon = "🟢" if profit_loss >= 0 else "🔴"
-                signals_past.append(f"🔴 Bán: Giá {sell['price']:.2f} vào {sell['timestamp'].strftime('%Y-%m-%d %H:%M:%S')}. {profit_icon} Lãi/Lỗ: {profit_loss:.2f}%")
-
-        # 🔥 Lãi/lỗ của tín hiệu MUA dựa trên giá hiện tại
-        current_price = df.iloc[-1]['close']
-        if last_buy_price:
-            profit_loss_buy = ((current_price - last_buy_price) / last_buy_price) * 100
-            profit_icon_buy = "🟢" if profit_loss_buy >= 0 else "🔴"
-            profit_text = f"💰 Hiện tại: Giá {current_price:.2f}. {profit_icon_buy} Lãi/Lỗ: {profit_loss_buy:.2f}% (so với giá mua {last_buy_price:.2f} vào {last_buy_time.strftime('%Y-%m-%d %H:%M:%S')})"
-        else:
-            profit_text = "💰 Không có tín hiệu mua trước đó để tính lãi/lỗ."
+            # Phát hiện tín hiệu BÁN
+            elif (row['close'] < row['MA50'] and row['MACD'] < row['Signal'] and row['RSI'] > 70) or (row['close'] >= row['BB_Upper']):
+                if last_buy_signal:  # Nếu có giá mua trước đó thì tính lãi/lỗ
+                    profit_loss = ((row['close'] - last_buy_signal['price']) / last_buy_signal['price']) * 100
+                    profit_icon = "🟢" if profit_loss >= 0 else "🔴"
+                    signals_list.append(f"🔴 Bán: Giá {row['close']:.2f} USDT vào lúc {timestamp_str}. {profit_icon} Lãi/Lỗ: {profit_loss:.2f}%")
 
         # 📨 Gửi tin nhắn về tín hiệu
-        signal_message = f"Tín hiệu giao dịch cho {symbol}:\n\n"
-        signal_message += "\nTín hiệu trong 7 ngày qua:\n" + ("\n".join(signals_past) if signals_past else "Không có tín hiệu.")
-        signal_message += f"\n\n{profit_text}"
+        signal_message = f"📊 *Tín hiệu giao dịch cho {symbol}:*\n\n"
+        signal_message += "⚡ *Tín hiệu hiện tại:* Không có tín hiệu rõ ràng.\n\n"
+        signal_message += "📅 *Tín hiệu trong 7 ngày qua:*\n" + ("\n".join(signals_list) if signals_list else "Không có tín hiệu.")
 
-        await update.message.reply_text(signal_message)
+        await update.message.reply_text(signal_message, parse_mode="Markdown")
 
     except Exception as e:
         error_message = f"Lỗi: {e}\n{traceback.format_exc()}"
