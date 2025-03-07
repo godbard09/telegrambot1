@@ -558,7 +558,7 @@ async def list_signals(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Phát hiện tín hiệu mua/bán và tính toán lãi/lỗ theo thời gian tăng dần."""
+    """Quét tín hiệu trong vòng 7 ngày, nếu có BÁN thì tìm giá mua gần nhất (có thể ngoài 7 ngày) để tính lãi/lỗ, nhưng không hiển thị tín hiệu ngoài 7 ngày."""
     try:
         symbol = context.args[0] if context.args else None
         if not symbol:
@@ -601,25 +601,30 @@ async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         past_threshold = pd.Timestamp.now(tz='Asia/Ho_Chi_Minh') - pd.Timedelta(days=7)
         df_past = df[df['timestamp'] >= past_threshold]
 
-        # Danh sách tín hiệu (Lưu theo thứ tự thời gian tăng dần)
+        # Danh sách tín hiệu (chỉ trong 7 ngày)
         signals_list = []
-        last_buy_signal = None
+        last_buy_signal = None  # Dùng để tìm giá mua gần nhất, có thể vượt 7 ngày
 
-        for _, row in df.iterrows():  # Duyệt qua toàn bộ lịch sử
-            timestamp_str = row['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
-
-            # Phát hiện tín hiệu MUA
+        for _, row in df.iterrows():  # Duyệt toàn bộ lịch sử để tìm giá mua gần nhất
+            # Nếu phát hiện tín hiệu MUA (kể cả ngoài 7 ngày), lưu lại giá mua gần nhất
             if (row['close'] > row['MA50'] and row['MACD'] > row['Signal'] and row['RSI'] < 30) or (row['close'] <= row['BB_Lower']):
-                last_buy_signal = {"price": row['close'], "timestamp": row['timestamp']}  # Lưu lại giá mua gần nhất
-                profit_loss = ((df.iloc[-1]['close'] - row['close']) / row['close']) * 100  # Lãi/Lỗ dựa trên giá hiện tại
-                signals_list.append(f"🟢 Mua: Giá {row['close']:.2f} USDT vào lúc {timestamp_str}. 🟢 Lãi/Lỗ: {profit_loss:.2f}%")
+                last_buy_signal = {"price": row['close'], "timestamp": row['timestamp']}  # Lưu giá mua gần nhất
 
-            # Phát hiện tín hiệu BÁN
-            elif (row['close'] < row['MA50'] and row['MACD'] < row['Signal'] and row['RSI'] > 70) or (row['close'] >= row['BB_Upper']):
-                if last_buy_signal:  # Nếu có giá mua trước đó thì tính lãi/lỗ
-                    profit_loss = ((row['close'] - last_buy_signal['price']) / last_buy_signal['price']) * 100
-                    profit_icon = "🟢" if profit_loss >= 0 else "🔴"
-                    signals_list.append(f"🔴 Bán: Giá {row['close']:.2f} USDT vào lúc {timestamp_str}. {profit_icon} Lãi/Lỗ: {profit_loss:.2f}%")
+            # Nếu tín hiệu nằm trong 7 ngày gần nhất, xử lý hiển thị
+            if row['timestamp'] >= past_threshold:
+                timestamp_str = row['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
+
+                # ✅ Nếu là tín hiệu MUA -> Hiển thị & Tính lãi/lỗ dựa trên giá hiện tại
+                if (row['close'] > row['MA50'] and row['MACD'] > row['Signal'] and row['RSI'] < 30) or (row['close'] <= row['BB_Lower']):
+                    profit_loss = ((df.iloc[-1]['close'] - row['close']) / row['close']) * 100  # Lãi/Lỗ so với giá hiện tại
+                    signals_list.append(f"🟢 Mua: Giá {row['close']:.2f} USDT vào lúc {timestamp_str}. 🟢 Lãi/Lỗ: {profit_loss:.2f}%")
+
+                # ✅ Nếu là tín hiệu BÁN -> Tìm giá mua gần nhất (có thể vượt 7 ngày) để tính lãi/lỗ, nhưng không hiển thị giá mua cũ
+                elif (row['close'] < row['MA50'] and row['MACD'] < row['Signal'] and row['RSI'] > 70) or (row['close'] >= row['BB_Upper']):
+                    if last_buy_signal:  # Chỉ tính lãi/lỗ nếu có giá mua trước đó
+                        profit_loss = ((row['close'] - last_buy_signal['price']) / last_buy_signal['price']) * 100
+                        profit_icon = "🟢" if profit_loss >= 0 else "🔴"
+                        signals_list.append(f"🔴 Bán: Giá {row['close']:.2f} USDT vào lúc {timestamp_str}. {profit_icon} Lãi/Lỗ: {profit_loss:.2f}%")
 
         # 📨 Gửi tin nhắn về tín hiệu
         signal_message = f"📊 *Tín hiệu giao dịch cho {symbol}:*\n\n"
@@ -632,6 +637,7 @@ async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         error_message = f"Lỗi: {e}\n{traceback.format_exc()}"
         print(error_message)
         await update.message.reply_text("❌ Đã xảy ra lỗi. Vui lòng thử lại sau.")
+
 
 
 
