@@ -558,7 +558,7 @@ async def list_signals(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Phân tích và gửi tín hiệu mua bán."""
+    """Phân tích và gửi tín hiệu mua bán tối ưu."""
     try:
         symbol = context.args[0] if context.args else None
         if not symbol:
@@ -607,34 +607,10 @@ async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         df['BB_Upper'] = df['BB_Middle'] + 2 * df['close'].rolling(window=20).std()
         df['BB_Lower'] = df['BB_Middle'] - 2 * df['close'].rolling(window=20).std()
 
-        # Phát hiện tín hiệu mua/bán
-        last_row = df.iloc[-1]
-        signals_now = []
-        last_buy_price_global = None  # Lưu giá mua gần nhất hợp lệ
+        # Danh sách lưu tín hiệu mua
+        buy_signals = []
 
-        current_time = last_row['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
-        current_price = last_row['close']
-
-        # Kiểm tra tín hiệu mua
-        if (last_row['close'] > last_row['MA50'] and
-            last_row['MACD'] > last_row['Signal'] and
-            last_row['RSI'] < 30) or (last_row['close'] <= last_row['BB_Lower']):
-            if last_buy_price_global is None:
-                last_buy_price_global = last_row['close']
-            profit_loss = ((current_price - last_buy_price_global) / last_buy_price_global) * 100
-            profit_icon = "\U0001F7E2" if profit_loss >= 0 else "\U0001F534"
-            signals_now.append(f"\U0001F7E2 Mua: Giá {last_row['close']:.2f} {unit} vào lúc {current_time}. {profit_icon} Lãi/Lỗ: {profit_loss:.2f}%")
-
-        # Kiểm tra tín hiệu bán
-        if (last_row['close'] < last_row['MA50'] and
-            last_row['MACD'] < last_row['Signal'] and
-            last_row['RSI'] > 70) or (last_row['close'] >= last_row['BB_Upper']):
-            if last_buy_price_global is not None:
-                profit_loss = ((last_row['close'] - last_buy_price_global) / last_buy_price_global) * 100
-                profit_icon = "\U0001F7E2" if profit_loss >= 0 else "\U0001F534"
-                signals_now.append(f"\U0001F534 Bán: Giá {current_price:.2f} {unit} vào lúc {current_time}. {profit_icon} Lãi/Lỗ: {profit_loss:.2f}%")
-
-        # Phát hiện tín hiệu trong 7 ngày qua
+        # Tìm tín hiệu trong 7 ngày qua
         signals_past = []
         past_threshold = pd.Timestamp.now(tz='Asia/Ho_Chi_Minh') - pd.Timedelta(days=7)
         df_past = df[df['timestamp'] >= past_threshold]
@@ -644,18 +620,37 @@ async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
             # Kiểm tra tín hiệu mua
             if (row['close'] > row['MA50'] and row['MACD'] > row['Signal'] and row['RSI'] < 30) or (row['close'] <= row['BB_Lower']):
-                if last_buy_price_global is None:
-                    last_buy_price_global = row['close']
-                profit_loss = ((current_price - last_buy_price_global) / last_buy_price_global) * 100
-                profit_icon = "\U0001F7E2" if profit_loss >= 0 else "\U0001F534"
-                signals_past.append(f"\U0001F7E2 Mua: Giá {row['close']:.2f} {unit} vào lúc {past_time}. {profit_icon} Lãi/Lỗ: {profit_loss:.2f}%")
+                buy_signals.append({"price": row['close'], "timestamp": past_time})
+                signals_past.append(f"\U0001F7E2 Mua: Giá {row['close']:.2f} {unit} vào lúc {past_time}.")
 
             # Kiểm tra tín hiệu bán
-            if (row['close'] < row['MA50'] and row['MACD'] < row['Signal'] and row['RSI'] > 70) or (row['close'] >= row['BB_Upper']):
-                if last_buy_price_global is not None:
-                    profit_loss = ((row['close'] - last_buy_price_global) / last_buy_price_global) * 100
+            elif (row['close'] < row['MA50'] and row['MACD'] < row['Signal'] and row['RSI'] > 70) or (row['close'] >= row['BB_Upper']):
+                if buy_signals:
+                    last_buy = buy_signals[-1]  # Lấy lần mua gần nhất
+                    profit_loss = ((row['close'] - last_buy['price']) / last_buy['price']) * 100
                     profit_icon = "\U0001F7E2" if profit_loss >= 0 else "\U0001F534"
                     signals_past.append(f"\U0001F534 Bán: Giá {row['close']:.2f} {unit} vào lúc {past_time}. {profit_icon} Lãi/Lỗ: {profit_loss:.2f}%")
+                    buy_signals.pop()  # Loại bỏ tín hiệu mua đã sử dụng
+
+        # Phát hiện tín hiệu hiện tại
+        last_row = df.iloc[-1]
+        current_time = last_row['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
+        current_price = last_row['close']
+        signals_now = []
+
+        # Kiểm tra tín hiệu mua
+        if (last_row['close'] > last_row['MA50'] and last_row['MACD'] > last_row['Signal'] and last_row['RSI'] < 30) or (last_row['close'] <= last_row['BB_Lower']):
+            buy_signals.append({"price": last_row['close'], "timestamp": current_time})
+            signals_now.append(f"\U0001F7E2 Mua: Giá {last_row['close']:.2f} {unit} vào lúc {current_time}.")
+
+        # Kiểm tra tín hiệu bán
+        elif (last_row['close'] < last_row['MA50'] and last_row['MACD'] < last_row['Signal'] and last_row['RSI'] > 70) or (last_row['close'] >= last_row['BB_Upper']):
+            if buy_signals:
+                last_buy = buy_signals[-1]
+                profit_loss = ((current_price - last_buy['price']) / last_buy['price']) * 100
+                profit_icon = "\U0001F7E2" if profit_loss >= 0 else "\U0001F534"
+                signals_now.append(f"\U0001F534 Bán: Giá {current_price:.2f} {unit} vào lúc {current_time}. {profit_icon} Lãi/Lỗ: {profit_loss:.2f}%")
+                buy_signals.pop()
 
         # Gửi tín hiệu qua Telegram
         signal_message = f"Tín hiệu giao dịch cho {symbol}:\n"
@@ -666,8 +661,9 @@ async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     except Exception as e:
         error_message = f"Lỗi: {e}\n{traceback.format_exc()}"
-        print(error_message)  # Log lỗi chi tiết
+        print(error_message)
         await update.message.reply_text("Đã xảy ra lỗi. Vui lòng thử lại sau.")
+
 
 
 async def info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
