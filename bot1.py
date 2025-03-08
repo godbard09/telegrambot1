@@ -617,13 +617,14 @@ async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 # ✅ Nếu là tín hiệu MUA -> Hiển thị & Tính lãi/lỗ dựa trên giá hiện tại
                 if (row['close'] > row['MA50'] and row['MACD'] > row['Signal'] and row['RSI'] < 30) or (row['close'] <= row['BB_Lower']):
                     profit_loss = ((df.iloc[-1]['close'] - row['close']) / row['close']) * 100  # Lãi/Lỗ so với giá hiện tại
-                    signals_list.append(f"🟢 Mua: Giá {row['close']:.2f} USDT vào lúc {timestamp_str}. 🟢 Lãi/Lỗ: {profit_loss:.2f}%")
+                    profit_icon = "🟢" if profit_loss > 0 else "🟡" if profit_loss == 0 else "🔴"
+                    signals_list.append(f"🟢 Mua: Giá {row['close']:.2f} USDT vào lúc {timestamp_str}. {profit_icon} Lãi/Lỗ: {profit_loss:.2f}%")
 
                 # ✅ Nếu là tín hiệu BÁN -> Tìm giá mua gần nhất (có thể vượt 7 ngày) để tính lãi/lỗ, nhưng không hiển thị giá mua cũ
                 elif (row['close'] < row['MA50'] and row['MACD'] < row['Signal'] and row['RSI'] > 70) or (row['close'] >= row['BB_Upper']):
                     if last_buy_signal:  # Chỉ tính lãi/lỗ nếu có giá mua trước đó
                         profit_loss = ((row['close'] - last_buy_signal['price']) / last_buy_signal['price']) * 100
-                        profit_icon = "🟢" if profit_loss >= 0 else "🔴"
+                        profit_icon = "🟢" if profit_loss > 0 else "🟡" if profit_loss == 0 else "🔴"
                         signals_list.append(f"🔴 Bán: Giá {row['close']:.2f} USDT vào lúc {timestamp_str}. {profit_icon} Lãi/Lỗ: {profit_loss:.2f}%")
 
         # 📨 Gửi tin nhắn về tín hiệu
@@ -637,10 +638,6 @@ async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         error_message = f"Lỗi: {e}\n{traceback.format_exc()}"
         print(error_message)
         await update.message.reply_text("❌ Đã xảy ra lỗi. Vui lòng thử lại sau.")
-
-
-
-
 
 
 async def info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
