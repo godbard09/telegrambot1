@@ -869,43 +869,69 @@ async def desc(update, context):
         await update.message.reply_text(f"Đã xảy ra lỗi: {e}")
 
 async def sentiment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Lấy chỉ số Fear & Greed từ alternative.me, hiển thị text và gửi ảnh mới nhất."""
+    """Lấy chỉ số Fear & Greed từ alternative.me, hiển thị text + bảng lịch sử và gửi ảnh mới nhất."""
     try:
         # Gọi API alternative.me
         url = "https://api.alternative.me/fng/"
         response = requests.get(url)
         data = response.json()
 
-        if "data" not in data or not data["data"]:
+        if "data" not in data or len(data["data"]) < 4:
             await update.message.reply_text("❌ Không thể lấy dữ liệu chỉ số Fear & Greed. Vui lòng thử lại sau!")
             return
 
-        # Lấy thông tin chỉ số
-        fng_data = data["data"][0]
-        value = int(fng_data["value"])
-        status = fng_data["value_classification"]
-        last_updated = datetime.utcfromtimestamp(int(fng_data["timestamp"])).strftime('%Y-%m-%d')
+        # Lấy dữ liệu gần nhất
+        fng_now = data["data"][0]
+        fng_yesterday = data["data"][1]
+        fng_last_week = data["data"][2]
+        fng_last_month = data["data"][3]
+
+        # Lấy giá trị chỉ số
+        now_value = int(fng_now["value"])
+        yesterday_value = int(fng_yesterday["value"])
+        last_week_value = int(fng_last_week["value"])
+        last_month_value = int(fng_last_month["value"])
+
+        # Lấy trạng thái (Fear/Greed)
+        now_status = fng_now["value_classification"]
+        yesterday_status = fng_yesterday["value_classification"]
+        last_week_status = fng_last_week["value_classification"]
+        last_month_status = fng_last_month["value_classification"]
+
+        # Ngày cập nhật
+        last_updated = datetime.utcfromtimestamp(int(fng_now["timestamp"])).strftime('%Y-%m-%d')
 
         # Xác định màu và icon phù hợp
-        if value < 25:
-            color = "🔴 (Extreme Fear)"
-        elif value < 50:
-            color = "🟠 (Fear)"
-        elif value < 75:
-            color = "🟢 (Greed)"
-        else:
-            color = "🟢🟢 (Extreme Greed)"
+        def get_color(value):
+            if value < 25:
+                return "🔴 (Extreme Fear)"
+            elif value < 50:
+                return "🟠 (Fear)"
+            elif value < 75:
+                return "🟢 (Greed)"
+            else:
+                return "🟢🟢 (Extreme Greed)"
 
-        # URL ảnh (thêm timestamp để tránh cache)
-        timestamp = int(time.time())  # Thời gian hiện tại theo giây
+        # URL ảnh (thêm timestamp để tránh cache cũ)
+        timestamp = int(time.time())
         image_url = f"https://alternative.me/crypto/fear-and-greed-index.png?{timestamp}"
+
+        # Tạo bảng lịch sử giống ảnh mẫu
+        history_table = (
+            "📊 *Historical Values*\n"
+            f"📅 *Now:* {now_value} - {now_status}\n"
+            f"📅 *Yesterday:* {yesterday_value} - {yesterday_status}\n"
+            f"📅 *Last week:* {last_week_value} - {last_week_status}\n"
+            f"📅 *Last month:* {last_month_value} - {last_month_status}"
+        )
 
         # Gửi tin nhắn văn bản trước
         message = (
             f"📊 *Crypto Fear & Greed Index*\n"
             f"📅 *Ngày cập nhật:* {last_updated}\n"
-            f"📈 *Chỉ số hiện tại:* {value}/100\n"
-            f"⚖️ *Tâm lý thị trường:* {status} {color}"
+            f"📈 *Chỉ số hiện tại:* {now_value}/100\n"
+            f"⚖️ *Tâm lý thị trường:* {now_status} {get_color(now_value)}\n\n"
+            f"{history_table}"
         )
         await update.message.reply_text(message, parse_mode="Markdown")
 
