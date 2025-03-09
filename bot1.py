@@ -40,7 +40,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "Gõ /info để xem thông tin đồng coin.\n"
         "Gõ /heatmap để xem heatmap của 100 đồng coin.\n"
         "Gõ /sentiment để xem sentiment.\n"
-        "Gõ /desc để xem mô tả đồng coin."
+        "Gõ /desc để xem mô tả đồng coin.\n"
+        "Gõ /trending để xem top 15 trend coin."
     )
 
 
@@ -915,6 +916,42 @@ async def sentiment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     except Exception as e:
         await update.message.reply_text(f"❌ Lỗi khi lấy dữ liệu: {e}")
 
+async def trending(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Lấy danh sách các đồng coin đang trending trên CoinGecko và hiển thị giống ảnh mẫu."""
+    try:
+        # Gọi API CoinGecko
+        url = "https://api.coingecko.com/api/v3/search/trending"
+        response = requests.get(url)
+        data = response.json()
+
+        if "coins" not in data or not data["coins"]:
+            await update.message.reply_text("❌ Không thể lấy dữ liệu trending. Vui lòng thử lại sau!")
+            return
+
+        # Lấy danh sách top trending coins
+        trending_coins = data["coins"][:15]  # Lấy top 15 coin trending
+
+        # Tạo danh sách hiển thị
+        trending_list = []
+        for index, coin in enumerate(trending_coins, start=1):
+            name = coin["item"]["name"]
+            symbol = coin["item"]["symbol"].upper()
+            score = coin["item"]["score"]
+            link = f"[{name} ($ {symbol})](https://www.coingecko.com/en/coins/{coin['item']['id']})"
+            trending_list.append(f"{index}.) {link} | {score}")
+
+        # Tạo nội dung tin nhắn
+        message = (
+            "🔥 *Search Trends - Coingecko* 🔥\n\n"
+            + "\n".join(trending_list) +
+            "\n\n[Join our News Channel🔥](https://t.me/your_news_channel)"
+        )
+
+        # Gửi tin nhắn với Markdown
+        await update.message.reply_text(message, parse_mode="Markdown", disable_web_page_preview=True)
+
+    except Exception as e:
+        await update.message.reply_text(f"❌ Lỗi khi lấy dữ liệu: {e}")
 
 
 async def set_webhook(application: Application):
@@ -941,6 +978,8 @@ def main():
     application.add_handler(CommandHandler("heatmap", heatmap))
     application.add_handler(CommandHandler("desc", desc))
     application.add_handler(CommandHandler("sentiment", sentiment))
+    application.add_handler(CommandHandler("trending", trending))
+
 
     # Chạy webhook
     application.run_webhook(
