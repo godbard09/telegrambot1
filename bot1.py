@@ -868,7 +868,7 @@ async def desc(update, context):
         await update.message.reply_text(f"Đã xảy ra lỗi: {e}")
 
 async def sentiment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Lấy chỉ số Fear & Greed từ alternative.me và hiển thị dưới dạng hình ảnh."""
+    """Lấy chỉ số Fear & Greed từ alternative.me, hiển thị text và gửi ảnh."""
     try:
         # Gọi API alternative.me
         url = "https://api.alternative.me/fng/"
@@ -876,7 +876,7 @@ async def sentiment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         data = response.json()
 
         if "data" not in data or not data["data"]:
-            await update.message.reply_text("Không thể lấy dữ liệu chỉ số Fear & Greed. Vui lòng thử lại sau!")
+            await update.message.reply_text("❌ Không thể lấy dữ liệu chỉ số Fear & Greed. Vui lòng thử lại sau!")
             return
 
         # Lấy thông tin chỉ số
@@ -895,7 +895,10 @@ async def sentiment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         else:
             color = "🟢🟢 (Extreme Greed)"
 
-        # Gửi tin nhắn
+        # URL ảnh từ alternative.me
+        image_url = "https://alternative.me/crypto/fear-and-greed-index.png"
+
+        # Gửi tin nhắn văn bản trước
         message = (
             f"📊 *Crypto Fear & Greed Index*\n"
             f"📅 *Ngày cập nhật:* {last_updated}\n"
@@ -904,8 +907,12 @@ async def sentiment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
         await update.message.reply_text(message, parse_mode="Markdown")
 
+        # Gửi ảnh sau
+        await update.message.reply_photo(photo=image_url, caption="🖼 Fear & Greed Index Chart")
+
     except Exception as e:
-        await update.message.reply_text(f"Đã xảy ra lỗi: {e}")
+        await update.message.reply_text(f"❌ Lỗi khi lấy dữ liệu: {e}")
+
 
 
 
