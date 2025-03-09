@@ -15,6 +15,7 @@ import numpy as np
 import requests
 import traceback
 from datetime import datetime, timezone
+import time
 
 # Token bot từ BotFather
 TOKEN = "8117660223:AAHCEFYmz7GxYd9O7H-wIsp2P-J_o-kxP7s"
@@ -868,7 +869,7 @@ async def desc(update, context):
         await update.message.reply_text(f"Đã xảy ra lỗi: {e}")
 
 async def sentiment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Lấy chỉ số Fear & Greed từ alternative.me, hiển thị text và gửi ảnh."""
+    """Lấy chỉ số Fear & Greed từ alternative.me, hiển thị text và gửi ảnh mới nhất."""
     try:
         # Gọi API alternative.me
         url = "https://api.alternative.me/fng/"
@@ -895,8 +896,9 @@ async def sentiment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         else:
             color = "🟢🟢 (Extreme Greed)"
 
-        # URL ảnh từ alternative.me
-        image_url = "https://alternative.me/crypto/fear-and-greed-index.png"
+        # URL ảnh (thêm timestamp để tránh cache)
+        timestamp = int(time.time())  # Thời gian hiện tại theo giây
+        image_url = f"https://alternative.me/crypto/fear-and-greed-index.png?{timestamp}"
 
         # Gửi tin nhắn văn bản trước
         message = (
@@ -907,8 +909,8 @@ async def sentiment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
         await update.message.reply_text(message, parse_mode="Markdown")
 
-        # Gửi ảnh sau
-        await update.message.reply_photo(photo=image_url, caption="🖼 Fear & Greed Index Chart")
+        # Gửi ảnh sau (luôn lấy ảnh mới nhất)
+        await update.message.reply_photo(photo=image_url, caption="🖼 Fear & Greed Index Chart (Updated)")
 
     except Exception as e:
         await update.message.reply_text(f"❌ Lỗi khi lấy dữ liệu: {e}")
