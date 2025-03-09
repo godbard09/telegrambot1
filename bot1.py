@@ -38,6 +38,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "Gõ /list để xem top 10 cặp giao dịch có tín hiệu mua bán gần đây.\n"
         "Gõ /info để xem thông tin đồng coin.\n"
         "Gõ /heatmap để xem heatmap của 100 đồng coin.\n"
+        "Gõ /sentiment để xem sentiment.\n"
         "Gõ /desc để xem mô tả đồng coin."
     )
 
@@ -866,6 +867,47 @@ async def desc(update, context):
     except Exception as e:
         await update.message.reply_text(f"Đã xảy ra lỗi: {e}")
 
+async def sentiment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Lấy chỉ số Fear & Greed từ alternative.me và hiển thị dưới dạng hình ảnh."""
+    try:
+        # Gọi API alternative.me
+        url = "https://api.alternative.me/fng/"
+        response = requests.get(url)
+        data = response.json()
+
+        if "data" not in data or not data["data"]:
+            await update.message.reply_text("Không thể lấy dữ liệu chỉ số Fear & Greed. Vui lòng thử lại sau!")
+            return
+
+        # Lấy thông tin chỉ số
+        fng_data = data["data"][0]
+        value = int(fng_data["value"])
+        status = fng_data["value_classification"]
+        last_updated = datetime.utcfromtimestamp(int(fng_data["timestamp"])).strftime('%Y-%m-%d')
+
+        # Xác định màu và icon phù hợp
+        if value < 25:
+            color = "🔴 (Extreme Fear)"
+        elif value < 50:
+            color = "🟠 (Fear)"
+        elif value < 75:
+            color = "🟢 (Greed)"
+        else:
+            color = "🟢🟢 (Extreme Greed)"
+
+        # Gửi tin nhắn
+        message = (
+            f"📊 *Crypto Fear & Greed Index*\n"
+            f"📅 *Ngày cập nhật:* {last_updated}\n"
+            f"📈 *Chỉ số hiện tại:* {value}/100\n"
+            f"⚖️ *Tâm lý thị trường:* {status} {color}"
+        )
+        await update.message.reply_text(message, parse_mode="Markdown")
+
+    except Exception as e:
+        await update.message.reply_text(f"Đã xảy ra lỗi: {e}")
+
+
 
 async def set_webhook(application: Application):
     """Thiết lập Webhook."""
@@ -890,6 +932,7 @@ def main():
     application.add_handler(CallbackQueryHandler(button))  # Thêm handler cho nút bấm từ /top
     application.add_handler(CommandHandler("heatmap", heatmap))
     application.add_handler(CommandHandler("desc", desc))
+    application.add_handler(CommandHandler("sentiment", sentiment))
 
     # Chạy webhook
     application.run_webhook(
