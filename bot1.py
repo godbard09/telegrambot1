@@ -917,7 +917,7 @@ async def sentiment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(f"❌ Lỗi khi lấy dữ liệu: {e}")
 
 async def trending(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Lấy danh sách các đồng coin đang trending trên CoinGecko và hiển thị giống ảnh mẫu."""
+    """Lấy danh sách các đồng coin đang trending trên CoinGecko và hiển thị số lượt tìm kiếm."""
     try:
         # Gọi API CoinGecko
         url = "https://api.coingecko.com/api/v3/search/trending"
@@ -936,16 +936,12 @@ async def trending(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         for index, coin in enumerate(trending_coins, start=1):
             name = coin["item"]["name"]
             symbol = coin["item"]["symbol"].upper()
-            score = coin["item"]["score"]
+            search_score = coin["item"].get("data", {}).get("search_score", 0)  # Lấy số lượt tìm kiếm
             link = f"[{name} ($ {symbol})](https://www.coingecko.com/en/coins/{coin['item']['id']})"
-            trending_list.append(f"{index}.) {link} | {score}")
+            trending_list.append(f"{index}.) {link} | {search_score}")
 
         # Tạo nội dung tin nhắn
-        message = (
-            "🔥 *Search Trends - Coingecko* 🔥\n\n"
-            + "\n".join(trending_list) +
-            "\n\n[Join our News Channel🔥](https://t.me/your_news_channel)"
-        )
+        message = "🔥 *Search Trends - Coingecko* 🔥\n\n" + "\n".join(trending_list)
 
         # Gửi tin nhắn với Markdown
         await update.message.reply_text(message, parse_mode="Markdown", disable_web_page_preview=True)
