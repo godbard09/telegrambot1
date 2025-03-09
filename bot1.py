@@ -917,7 +917,7 @@ async def sentiment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(f"❌ Lỗi khi lấy dữ liệu: {e}")
 
 async def trending(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Lấy danh sách các đồng coin đang trending trên CoinGecko và hiển thị số lượt tìm kiếm."""
+    """Lấy danh sách các đồng coin đang trending trên CoinGecko và hiển thị xếp hạng vốn hóa."""
     try:
         # Gọi API CoinGecko
         url = "https://api.coingecko.com/api/v3/search/trending"
@@ -936,9 +936,9 @@ async def trending(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         for index, coin in enumerate(trending_coins, start=1):
             name = coin["item"]["name"]
             symbol = coin["item"]["symbol"].upper()
-            search_score = coin["item"].get("data", {}).get("search_score", 0)  # Lấy số lượt tìm kiếm
+            market_cap_rank = coin["item"].get("market_cap_rank", "N/A")  # Lấy xếp hạng vốn hóa
             link = f"[{name} ($ {symbol})](https://www.coingecko.com/en/coins/{coin['item']['id']})"
-            trending_list.append(f"{index}.) {link} | {search_score}")
+            trending_list.append(f"{index}.) {link} | {market_cap_rank}")
 
         # Tạo nội dung tin nhắn
         message = "🔥 *Search Trends - Coingecko* 🔥\n\n" + "\n".join(trending_list)
@@ -948,6 +948,7 @@ async def trending(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     except Exception as e:
         await update.message.reply_text(f"❌ Lỗi khi lấy dữ liệu: {e}")
+
 
 
 async def set_webhook(application: Application):
