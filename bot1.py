@@ -955,12 +955,12 @@ async def list10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         await update.message.reply_text("📊 Đang quét tín hiệu của 10 coin lớn nhất... Vui lòng chờ!")
 
-        # 🔹 Lấy danh sách 11 đồng coin có vốn hóa lớn nhất từ CoinGecko (để có thể thay thế USDT)
+        # 🔹 Lấy danh sách 12 đồng coin có vốn hóa lớn nhất từ CoinGecko (để có thể thay thế USDT & STETH nếu cần)
         url = "https://api.coingecko.com/api/v3/coins/markets"
         params = {
             "vs_currency": "usd",
             "order": "market_cap_desc",
-            "per_page": 11,  # Lấy 11 coin để có phương án thay thế USDT
+            "per_page": 12,  # Lấy 12 coin để có phương án thay thế
             "page": 1,
             "sparkline": False
         }
@@ -971,16 +971,18 @@ async def list10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await update.message.reply_text("❌ Không thể lấy dữ liệu từ CoinGecko. Vui lòng thử lại sau!")
             return
 
-        # 🔹 Lọc bỏ USDT và lấy 10 coin có cặp USDT/KuCoin + Ghi nhớ thứ hạng vốn hóa
+        # 🔹 Lọc bỏ USDT, STETH nếu chúng không có cặp USDT trên KuCoin
+        exchange_markets = exchange.load_markets()  # Lấy danh sách cặp giao dịch từ KuCoin
         top_10_coins = []
-        coin_ranks = {}  # Lưu trữ thứ hạng từng coin
+        coin_ranks = {}  # Lưu trữ thứ hạng vốn hóa thực tế
         rank = 1
 
         for coin in data:
             symbol = coin["symbol"].upper()
-            if symbol != "USDT":  # Bỏ qua USDT
-                top_10_coins.append(symbol + "/USDT")
-                coin_ranks[symbol + "/USDT"] = f"#{rank}"  # Lưu hạng
+            pair = f"{symbol}/USDT"
+            if symbol not in ["USDT"] and pair in exchange_markets:  # Chỉ lấy coin có cặp USDT trên KuCoin
+                top_10_coins.append(pair)
+                coin_ranks[pair] = f"#{rank}"  # Ghi nhớ thứ hạng vốn hóa thực
                 rank += 1
             if len(top_10_coins) == 10:  # Chỉ lấy đúng 10 coin
                 break
@@ -1075,6 +1077,7 @@ async def list10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     except Exception as e:
         await update.message.reply_text(f"❌ Đã xảy ra lỗi: {e}")
+
 
 
 async def set_webhook(application: Application):
