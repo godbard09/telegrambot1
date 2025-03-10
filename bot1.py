@@ -951,7 +951,7 @@ async def trending(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(f"❌ Lỗi khi lấy dữ liệu: {e}")
 
 async def list10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Lấy tín hiệu gần nhất và tính lãi/lỗ chuẩn như /smarttrade, hiển thị thứ hạng vốn hóa (#1, #2,...)."""
+    """Lấy tín hiệu gần nhất và tính lãi/lỗ chuẩn như /smarttrade, hiển thị đúng thứ hạng vốn hóa trên CoinGecko."""
     try:
         await update.message.reply_text("📊 Đang quét tín hiệu của 10 coin lớn nhất... Vui lòng chờ!")
 
@@ -960,7 +960,7 @@ async def list10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         params = {
             "vs_currency": "usd",
             "order": "market_cap_desc",
-            "per_page": 12,  # Lấy 12 coin để có phương án thay thế
+            "per_page": 12,  # Lấy 12 coin để thay thế nếu cần
             "page": 1,
             "sparkline": False
         }
@@ -971,20 +971,22 @@ async def list10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await update.message.reply_text("❌ Không thể lấy dữ liệu từ CoinGecko. Vui lòng thử lại sau!")
             return
 
-        # 🔹 Lọc bỏ USDT, STETH nếu chúng không có cặp USDT trên KuCoin
+        # 🔹 Lọc bỏ USDT, STETH và giữ nguyên thứ hạng vốn hóa thực tế
         exchange_markets = exchange.load_markets()  # Lấy danh sách cặp giao dịch từ KuCoin
         top_10_coins = []
         coin_ranks = {}  # Lưu trữ thứ hạng vốn hóa thực tế
-        rank = 1
+        actual_rank = 1  # Thứ hạng thực từ CoinGecko
+        filtered_rank = 1  # Thứ hạng sau khi bỏ coin không có cặp USDT trên KuCoin
 
         for coin in data:
             symbol = coin["symbol"].upper()
             pair = f"{symbol}/USDT"
-            if symbol not in ["USDT"] and pair in exchange_markets:  # Chỉ lấy coin có cặp USDT trên KuCoin
+            if symbol not in ["USDT", "STETH"] and pair in exchange_markets:  # Chỉ lấy coin có cặp USDT trên KuCoin
                 top_10_coins.append(pair)
-                coin_ranks[pair] = f"#{rank}"  # Ghi nhớ thứ hạng vốn hóa thực
-                rank += 1
-            if len(top_10_coins) == 10:  # Chỉ lấy đúng 10 coin
+                coin_ranks[pair] = f"#{actual_rank}"  # Ghi nhớ thứ hạng vốn hóa thực
+                filtered_rank += 1  # Tăng thứ hạng thực tế
+            actual_rank += 1  # Luôn tăng thứ hạng theo CoinGecko
+            if len(top_10_coins) == 10:  # Chỉ lấy đúng 10 coin có thể giao dịch
                 break
 
         timeframe = '2h'
@@ -1077,6 +1079,7 @@ async def list10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     except Exception as e:
         await update.message.reply_text(f"❌ Đã xảy ra lỗi: {e}")
+
 
 
 
