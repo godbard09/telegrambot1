@@ -972,7 +972,7 @@ async def list10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
         top_10_coins = [coin["symbol"].upper() + "/USDT" for coin in data]  # Chuyển thành cặp giao dịch trên KuCoin
         timeframe = '2h'
-        limit = 200
+        limit = 500
 
         messages = []
         for symbol in top_10_coins:
