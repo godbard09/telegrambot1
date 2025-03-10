@@ -950,16 +950,16 @@ async def trending(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(f"❌ Lỗi khi lấy dữ liệu: {e}")
 
 async def list10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Lấy tín hiệu gần nhất và tính lãi/lỗ chuẩn như /smarttrade."""
+    """Lấy tín hiệu gần nhất và tính lãi/lỗ chuẩn như /smarttrade, hiển thị thứ hạng vốn hóa (#1, #2,...)."""
     try:
         await update.message.reply_text("📊 Đang quét tín hiệu của 10 coin lớn nhất... Vui lòng chờ!")
 
-        # 🔹 Lấy danh sách 10 đồng coin có vốn hóa lớn nhất từ CoinGecko
+        # 🔹 Lấy danh sách 11 đồng coin có vốn hóa lớn nhất từ CoinGecko (để có thể thay thế USDT)
         url = "https://api.coingecko.com/api/v3/coins/markets"
         params = {
             "vs_currency": "usd",
             "order": "market_cap_desc",
-            "per_page": 10,
+            "per_page": 11,  # Lấy 11 coin để có phương án thay thế USDT
             "page": 1,
             "sparkline": False
         }
@@ -970,7 +970,20 @@ async def list10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await update.message.reply_text("❌ Không thể lấy dữ liệu từ CoinGecko. Vui lòng thử lại sau!")
             return
 
-        top_10_coins = [coin["symbol"].upper() + "/USDT" for coin in data]
+        # 🔹 Lọc bỏ USDT và lấy 10 coin có cặp USDT/KuCoin + Ghi nhớ thứ hạng vốn hóa
+        top_10_coins = []
+        coin_ranks = {}  # Lưu trữ thứ hạng từng coin
+        rank = 1
+
+        for coin in data:
+            symbol = coin["symbol"].upper()
+            if symbol != "USDT":  # Bỏ qua USDT
+                top_10_coins.append(symbol + "/USDT")
+                coin_ranks[symbol + "/USDT"] = f"#{rank}"  # Lưu hạng
+                rank += 1
+            if len(top_10_coins) == 10:  # Chỉ lấy đúng 10 coin
+                break
+
         timeframe = '2h'
         limit = 500  # Giống hệt /smarttrade
 
@@ -1044,9 +1057,9 @@ async def list10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     signal_text = f"{'🟢 MUA' if last_signal['type'] == 'MUA' else '🔴 BÁN'} @ {last_signal['price']:.2f} USDT"
                     signal_text += f"\n📅 *Thời điểm:* {last_signal['timestamp']}"
 
-                # Tạo nội dung hiển thị
+                # **Thêm thứ hạng #1, #2,...**
                 messages.append(
-                    f"📊 *{symbol}*\n"
+                    f"📊 *{symbol} {coin_ranks[symbol]}*\n"
                     f"💰 *Giá hiện tại:* {current_price:.2f} USDT\n"
                     f"⚡ *Tín hiệu gần nhất:* {signal_text}\n"
                     f"📈 *Lãi/Lỗ:* {profit_loss}\n"
@@ -1061,7 +1074,6 @@ async def list10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     except Exception as e:
         await update.message.reply_text(f"❌ Đã xảy ra lỗi: {e}")
-
 
 
 async def set_webhook(application: Application):
