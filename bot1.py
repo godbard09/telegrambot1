@@ -950,7 +950,7 @@ async def trending(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(f"❌ Lỗi khi lấy dữ liệu: {e}")
 
 async def list10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Lấy tín hiệu gần nhất và lãi/lỗ của 10 coin vốn hóa lớn nhất trên thị trường (Giống /smarttrade)."""
+    """Lấy tín hiệu gần nhất và lãi/lỗ của 10 coin vốn hóa lớn nhất (Giống 100% /smarttrade)."""
     try:
         await update.message.reply_text("📊 Đang quét tín hiệu của 10 coin lớn nhất... Vui lòng chờ!")
 
@@ -972,7 +972,7 @@ async def list10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
         top_10_coins = [coin["symbol"].upper() + "/USDT" for coin in data]
         timeframe = '2h'
-        limit = 500  # Giống /smarttrade
+        limit = 500  # Giống hệt /smarttrade
 
         messages = []
         for symbol in top_10_coins:
@@ -984,7 +984,6 @@ async def list10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
                 # Tính toán các chỉ báo kỹ thuật
                 df['MA50'] = df['close'].rolling(window=50).mean()
-                df['MA100'] = df['close'].rolling(window=100).mean()
                 df['EMA12'] = df['close'].ewm(span=12).mean()
                 df['EMA26'] = df['close'].ewm(span=26).mean()
                 df['MACD'] = df['EMA12'] - df['EMA26']
@@ -998,44 +997,48 @@ async def list10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 df['BB_Upper'] = df['BB_Middle'] + 2 * df['close'].rolling(window=20).std()
                 df['BB_Lower'] = df['BB_Middle'] - 2 * df['close'].rolling(window=20).std()
 
-                # Lấy giá hiện tại
-                last_row = df.iloc[-1]
-                current_price = last_row['close']
-                timestamp_str = last_row['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
+                # 🟢 Tìm tín hiệu gần nhất giống /smarttrade
+                last_buy = None
+                last_signal = None
 
-                # 🔥 **Tìm tín hiệu mua/bán giống /smarttrade**
-                last_buy_price = None
-                signal_type = None
-                for _, row in df.iterrows():
+                for _, row in df[::-1].iterrows():  # Duyệt từ cuối lên đầu (tìm tín hiệu gần nhất)
+                    timestamp_str = row['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
+
                     if row['close'] > row['MA50'] and row['MACD'] > row['Signal'] and row['RSI'] < 30:
-                        last_buy_price = row['close']  # Lưu giá mua gần nhất
-                        signal_type = "🟢 MUA"
+                        last_buy = {"price": row['close'], "timestamp": timestamp_str, "type": "MUA"}
+                        last_signal = last_buy
+                        break  # Dừng khi tìm thấy tín hiệu gần nhất
                     elif row['close'] <= row['BB_Lower']:
-                        last_buy_price = row['close']
-                        signal_type = "🟢 MUA"
+                        last_buy = {"price": row['close'], "timestamp": timestamp_str, "type": "MUA"}
+                        last_signal = last_buy
+                        break
                     elif row['close'] < row['MA50'] and row['MACD'] < row['Signal'] and row['RSI'] > 70:
-                        signal_type = "🔴 BÁN"
+                        last_signal = {"price": row['close'], "timestamp": timestamp_str, "type": "BÁN"}
+                        break
                     elif row['close'] >= row['BB_Upper']:
-                        signal_type = "🔴 BÁN"
+                        last_signal = {"price": row['close'], "timestamp": timestamp_str, "type": "BÁN"}
+                        break
 
-                # Tính lãi/lỗ nếu có giá mua trước đó
+                # 🔴 Nếu là tín hiệu BÁN, tìm giá mua gần nhất để tính lãi/lỗ
                 profit_loss = "N/A"
-                if last_buy_price and signal_type == "🔴 BÁN":
-                    profit_percent = ((current_price - last_buy_price) / last_buy_price) * 100
+                if last_signal and last_signal["type"] == "BÁN" and last_buy:
+                    profit_percent = ((last_signal["price"] - last_buy["price"]) / last_buy["price"]) * 100
                     profit_icon = "🟢" if profit_percent > 0 else "🔴" if profit_percent < 0 else "🟡"
                     profit_loss = f"{profit_icon} {profit_percent:.2f}%"
 
-                # Nếu không có tín hiệu, hiển thị cảnh báo
-                if not signal_type:
-                    signal_type = "⚠️ Không có tín hiệu rõ ràng"
+                # Nếu không có tín hiệu, hiển thị thông báo rõ ràng
+                if not last_signal:
+                    signal_text = "⚠️ Không có tín hiệu rõ ràng"
                     profit_loss = "🕵️ Bot tiếp tục theo dõi!"
+                else:
+                    signal_text = f"{'🟢 MUA' if last_signal['type'] == 'MUA' else '🔴 BÁN'} @ {last_signal['price']:.2f} USDT"
+                    signal_text += f"\n📅 *Thời điểm:* {last_signal['timestamp']}"
 
                 # Tạo nội dung hiển thị
                 messages.append(
                     f"📊 *{symbol}*\n"
-                    f"💰 *Giá hiện tại:* {current_price:.2f} USDT\n"
-                    f"📅 *Cập nhật:* {timestamp_str}\n"
-                    f"⚡ *Tín hiệu:* {signal_type}\n"
+                    f"💰 *Giá hiện tại:* {df.iloc[-1]['close']:.2f} USDT\n"
+                    f"⚡ *Tín hiệu gần nhất:* {signal_text}\n"
                     f"📈 *Lãi/Lỗ:* {profit_loss}\n"
                 )
 
@@ -1048,6 +1051,7 @@ async def list10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     except Exception as e:
         await update.message.reply_text(f"❌ Đã xảy ra lỗi: {e}")
+
 
 
 
