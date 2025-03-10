@@ -972,7 +972,7 @@ async def list10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
         top_10_coins = [coin["symbol"].upper() + "/USDT" for coin in data]  # Chuyển thành cặp giao dịch trên KuCoin
         timeframe = '2h'
-        limit = 500
+        limit = 500  # Tăng số lượng nến kiểm tra
 
         messages = []
         for symbol in top_10_coins:
@@ -1013,25 +1013,30 @@ async def list10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 elif last_row['close'] >= last_row['BB_Upper']:
                     signal_type = "🔴 BÁN"
 
-                # Tìm giá mua gần nhất để tính lãi/lỗ
+                # Tìm giá mua gần nhất (có thể nằm ngoài 7 ngày)
                 last_buy_price = None
                 for _, row in df.iterrows():
                     if (row['close'] > row['MA50'] and row['MACD'] > row['Signal'] and row['RSI'] < 30) or (row['close'] <= row['BB_Lower']):
                         last_buy_price = row['close']  # Lưu giá mua gần nhất
 
                 # Tính lãi/lỗ nếu có giá mua trước đó
-                profit_loss = "N/A"
+                profit_loss = "Không có dữ liệu"
                 if last_buy_price and signal_type == "🔴 BÁN":
                     profit_percent = ((current_price - last_buy_price) / last_buy_price) * 100
                     profit_icon = "🟢" if profit_percent > 0 else "🔴" if profit_percent < 0 else "🟡"
                     profit_loss = f"{profit_icon} {profit_percent:.2f}%"
+
+                # Nếu không có tín hiệu, hiển thị thông báo rõ ràng
+                if not signal_type:
+                    signal_type = "⚠️ Không có tín hiệu rõ ràng"
+                    profit_loss = "🕵️ Bot tiếp tục theo dõi!"
 
                 # Tạo nội dung cho từng coin
                 messages.append(
                     f"📊 *{symbol}*\n"
                     f"💰 *Giá hiện tại:* {current_price:.2f} USDT\n"
                     f"📅 *Cập nhật:* {timestamp_str}\n"
-                    f"⚡ *Tín hiệu:* {signal_type if signal_type else 'Không có'}\n"
+                    f"⚡ *Tín hiệu:* {signal_type}\n"
                     f"📈 *Lãi/Lỗ:* {profit_loss}\n"
                 )
 
