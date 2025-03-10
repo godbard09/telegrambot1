@@ -37,6 +37,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "Gõ /signal <mã giao dịch> để xem lịch sử tín hiệu mua bán trong 7 ngày qua.\n"
         "Gõ /smarttrade <mã giao dịch> để xem thông tin và tín hiệu mua bán mới nhất.\n"
         "Gõ /list để xem top 10 cặp giao dịch có tín hiệu mua bán gần đây.\n"
+        "Gõ /list10 để xem tín hiệu mua bán gần đây của 10 cặp giao dịch có vốn hóa lớn nhất thị trường.\n"
         "Gõ /info để xem thông tin đồng coin.\n"
         "Gõ /heatmap để xem heatmap của 100 đồng coin.\n"
         "Gõ /sentiment để xem sentiment.\n"
